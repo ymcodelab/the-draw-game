@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>生動版起重機抽籤</title>
+    <title>碼頭抽籤機</title>
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: "Microsoft JhengHei", sans-serif; overflow: hidden; }
         
         .container { display: flex; height: 100vh; }
 
-        /* 左側控制面板 */
+        /* 左側面板 */
         .sidebar {
             width: 280px;
             background-color: #f8f9fa;
@@ -69,6 +69,11 @@
         }
         .result-box h3 { margin: 0 0 5px 0; font-size: 14px; color: #666; }
         .result-name { font-size: 24px; font-weight: bold; color: #d32f2f; }
+        
+        /* 剩餘人數顯示 */
+        .count-info {
+            font-size: 12px; color: #666; text-align: right; margin-top: 5px;
+        }
 
         /* 右側遊戲區 */
         .game-area {
@@ -78,190 +83,66 @@
             overflow: hidden;
         }
 
-        /* 背景裝飾：雲 */
-        .cloud {
-            position: absolute;
-            background: rgba(255,255,255,0.8);
-            border-radius: 50px;
-        }
+        /* 雲朵 */
+        .cloud { position: absolute; background: rgba(255,255,255,0.8); border-radius: 50px; }
         .c1 { width: 100px; height: 40px; top: 10%; left: 10%; animation: float 20s infinite linear; }
         .c2 { width: 140px; height: 60px; top: 20%; left: 60%; animation: float 30s infinite linear reverse; }
-        
         @keyframes float { from { transform: translateX(0); } to { transform: translateX(50px); } }
 
         /* 大海 */
         .sea {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 70%; /* 海佔據左邊 70% */
-            height: 180px;
+            bottom: 0; left: 0; width: 70%; height: 180px;
             background: linear-gradient(to bottom, #0288d1 0%, #01579b 100%);
-            z-index: 5;
-            border-right: 5px solid rgba(0,0,0,0.1);
+            z-index: 5; border-right: 5px solid rgba(0,0,0,0.1);
         }
 
         /* 碼頭平地 */
         .pier {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 30%; /* 碼頭佔據右邊 30% */
-            height: 180px;
-            background: repeating-linear-gradient(
-                45deg,
-                #6d4c41,
-                #6d4c41 10px,
-                #5d4037 10px,
-                #5d4037 20px
-            );
+            position: absolute; bottom: 0; right: 0; width: 30%; height: 180px;
+            background: repeating-linear-gradient(45deg, #6d4c41, #6d4c41 10px, #5d4037 10px, #5d4037 20px);
             box-shadow: inset 5px 0 10px rgba(0,0,0,0.3);
             z-index: 5;
-            display: flex;
-            align-items: flex-end; /* 人站在底部 */
-            justify-content: center;
-            padding-bottom: 20px; /* 離底部一點距離 */
+            display: flex; align-items: flex-end; justify-content: center;
+            padding-bottom: 20px;
         }
-
-        /* 碼頭邊緣的柱子 */
-        .pier::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 10px;
-            width: 10px;
-            height: 100%;
-            background: #3e2723;
-        }
+        .pier::before { content: ''; position: absolute; left: 0; top: 10px; width: 10px; height: 100%; background: #3e2723; }
 
         /* 人群容器 */
         .crowd-container {
-            width: 90%;
-            display: flex;
-            flex-wrap: wrap-reverse; /* 從底部往上堆疊 */
-            justify-content: center;
-            gap: 5px;
-            position: relative;
-            z-index: 6;
+            width: 90%; display: flex; flex-wrap: wrap-reverse; 
+            justify-content: center; gap: 5px; position: relative; z-index: 6;
         }
 
         /* 單個小人偶 */
         .person {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 40px;
-            transition: opacity 0.3s;
-            position: relative;
+            display: flex; flex-direction: column; align-items: center; width: 40px;
+            transition: opacity 0.3s; position: relative;
         }
         .person-avatar { font-size: 30px; cursor: default; }
         .person-name { 
-            background: rgba(255,255,255,0.9); 
-            font-size: 10px; 
-            padding: 1px 3px; 
-            border-radius: 3px; 
-            white-space: nowrap; 
-            max-width: 60px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            background: rgba(255,255,255,0.9); font-size: 10px; padding: 1px 3px; 
+            border-radius: 3px; white-space: nowrap; max-width: 60px; overflow: hidden; text-overflow: ellipsis;
         }
-        /* 被選中時隱藏（因為要被起重機抓走） */
-        .person.chosen { opacity: 0; }
+        .person.chosen { opacity: 0; pointer-events: none; } /* 被選中後完全不可見不可點 */
 
-        /* ================= 起重機系統 ================= */
-        /* 起重機整體容器，用於水平移動 */
-        .crane-wrapper {
-            position: absolute;
-            top: 0;
-            left: 100px; /* 初始位置在海面上 */
-            height: 100%;
-            width: 100px; /* 只是定位點 */
-            z-index: 10;
-            transition: left 1s ease-in-out; /* 水平移動動畫 */
-        }
-
-        /* 頂部橫樑軌道 (視覺裝飾) */
-        .rail {
-            position: absolute;
-            top: 40px;
-            left: 0;
-            width: 100%;
-            height: 10px;
-            background: #555;
-            z-index: 9;
-            box-shadow: 0 5px 5px rgba(0,0,0,0.2);
-        }
-
-        /* 起重機本體 (連接軌道的部分) */
-        .crane-head {
-            position: absolute;
-            top: 30px;
-            left: -20px; /* 讓 wrapper 中心對準 */
-            width: 40px;
-            height: 30px;
-            background: #fbc02d;
-            border: 2px solid #f57f17;
-            border-radius: 5px;
-        }
-
-        /* 繩索 */
-        .rope {
-            position: absolute;
-            top: 60px; /* 接在 head 下面 */
-            left: 0; /* 在 wrapper 中心 */
-            width: 4px;
-            height: 50px; /* 初始長度 */
-            background: #333;
-            transform: translateX(-50%);
-            transition: height 1s linear; /* 升降動畫 */
-        }
-
-        /* 爪子 */
-        .claw {
-            position: absolute;
-            bottom: -25px;
-            left: -15px;
-            width: 34px;
-            height: 25px;
-            border: 4px solid #444;
-            border-top: none;
-            border-radius: 0 0 15px 15px;
-            transition: transform 0.2s;
-        }
+        /* 起重機 */
+        .crane-wrapper { position: absolute; top: 0; left: 100px; height: 100%; width: 100px; z-index: 10; transition: left 1s ease-in-out; }
+        .rail { position: absolute; top: 40px; left: 0; width: 100%; height: 10px; background: #555; z-index: 9; }
+        .crane-head { position: absolute; top: 30px; left: -20px; width: 40px; height: 30px; background: #fbc02d; border: 2px solid #f57f17; border-radius: 5px; }
+        .rope { position: absolute; top: 60px; left: 0; width: 4px; height: 50px; background: #333; transform: translateX(-50%); transition: height 1s linear; }
+        .claw { position: absolute; bottom: -25px; left: -15px; width: 34px; height: 25px; border: 4px solid #444; border-top: none; border-radius: 0 0 15px 15px; transition: transform 0.2s; }
         .claw.closed { transform: scaleX(0.7); border-color: #d32f2f; }
 
-        /* 被抓住的人 (跟隨爪子) */
-        .victim-on-claw {
-            position: absolute;
-            top: 100%; /* 在爪子下方 */
-            left: 50%;
-            transform: translateX(-50%);
-            display: none; /* 初始隱藏 */
-            flex-direction: column;
-            align-items: center;
-        }
-        .victim-on-claw .avatar { 
-            font-size: 35px; 
-            animation: struggle 0.2s infinite alternate; 
-        }
-        .victim-on-claw .name { 
-            background: #fff; padding: 2px 5px; border-radius: 4px; font-weight: bold; font-size: 12px; border: 1px solid #333;
-        }
-
+        /* 被抓的人 */
+        .victim-on-claw { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; }
+        .victim-on-claw .avatar { font-size: 35px; animation: struggle 0.2s infinite alternate; }
+        .victim-on-claw .name { background: #fff; padding: 2px 5px; border-radius: 4px; font-weight: bold; font-size: 12px; border: 1px solid #333; }
         @keyframes struggle { from { transform: rotate(-15deg); } to { transform: rotate(15deg); } }
 
-        /* 掉落的人 (脫離起重機後) */
-        .falling-victim {
-            position: absolute;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            z-index: 8;
-        }
-        .falling-victim.animate {
-            animation: dropAnim 0.8s cubic-bezier(0.6, 0.04, 0.98, 0.335) forwards;
-        }
-
+        /* 掉落的人 */
+        .falling-victim { position: absolute; display: none; flex-direction: column; align-items: center; z-index: 8; }
+        .falling-victim.animate { animation: dropAnim 0.8s cubic-bezier(0.6, 0.04, 0.98, 0.335) forwards; }
         @keyframes dropAnim {
             0% { transform: translateY(0) rotate(0deg); opacity: 1; }
             80% { opacity: 1; }
@@ -269,18 +150,8 @@
         }
 
         /* 水花 */
-        .splash {
-            position: absolute;
-            bottom: 160px; /* 海平面略低 */
-            left: 0; /* 由 JS 控制 */
-            width: 0; height: 0;
-            background: rgba(255,255,255,0.8);
-            border-radius: 50%;
-            transform: translateX(-50%);
-            z-index: 6;
-        }
+        .splash { position: absolute; bottom: 160px; left: 0; width: 0; height: 0; background: rgba(255,255,255,0.8); border-radius: 50%; transform: translateX(-50%); z-index: 6; }
         .splash.active { animation: splashAnim 0.5s ease-out; }
-
         @keyframes splashAnim {
             0% { width: 10px; height: 10px; bottom: 160px; opacity: 1; }
             50% { width: 60px; height: 60px; bottom: 190px; opacity: 0.8; }
@@ -294,15 +165,17 @@
 <div class="container">
     <div class="sidebar">
         <h2>🏗️ 碼頭抽籤機</h2>
-        <textarea id="nameList" placeholder="輸入名單 (每行一個):&#10;Batman&#10;Superman&#10;Spiderman&#10;Ironman&#10;Hulk">陳大文&#10;李小明&#10;張三&#10;Amy&#10;Peter&#10;Sakamoto&#10;John&#10;Mary</textarea>
+        <textarea id="nameList" placeholder="輸入名單 (每行一個):&#10;Batman&#10;Superman&#10;Spiderman">陳大文&#10;李小明&#10;張三&#10;Amy&#10;Peter&#10;Sakamoto&#10;John&#10;Mary</textarea>
         
         <div class="btn-group">
             <button id="updateBtn" onclick="renderCrowd()">🔄 更新人群</button>
-            <button id="drawBtn" onclick="startDraw()">🎣 啟動起重機</button>
+            <button id="drawBtn" onclick="startDraw()">🎣 啟動-掉佢落海</button>
         </div>
+        
+        <div class="count-info" id="countInfo">死剩種人數: 0</div>
 
         <div class="result-box">
-            <h3>掉左落海:</h3>
+            <h3>掉咗落海:</h3>
             <div class="result-name" id="resultName">---</div>
         </div>
     </div>
@@ -310,7 +183,6 @@
     <div class="game-area" id="gameArea">
         <div class="cloud c1"></div>
         <div class="cloud c2"></div>
-
         <div class="rail"></div>
 
         <div class="crane-wrapper" id="crane">
@@ -330,12 +202,9 @@
         </div>
 
         <div class="splash" id="splash"></div>
-
         <div class="sea"></div>
-
         <div class="pier">
-            <div class="crowd-container" id="crowdContainer">
-                </div>
+            <div class="crowd-container" id="crowdContainer"></div>
         </div>
     </div>
 </div>
@@ -343,9 +212,9 @@
 <script>
     // 配置
     const emojis = ['😃', '😎', '🤓', '😐', '😳', '🤠', '🥳', '🧐', '👶', '👩', '👨', '👴', '👵'];
-    const dropZoneLeft = 150; // 掉落區域（海的中心點）距離左邊的 px
+    const dropZoneLeft = 150; 
 
-    // DOM 元素
+    // DOM
     const nameListEl = document.getElementById('nameList');
     const crowdContainer = document.getElementById('crowdContainer');
     const crane = document.getElementById('crane');
@@ -360,14 +229,15 @@
     const splash = document.getElementById('splash');
     const resultNameEl = document.getElementById('resultName');
     const drawBtn = document.getElementById('drawBtn');
+    const countInfo = document.getElementById('countInfo');
 
     let isAnimating = false;
-    let personElements = []; // 儲存生成的 DOM 元素
+    let personElements = []; // 這是還在碼頭上的活人名單
 
     // 初始化
     renderCrowd();
 
-    // 1. 生成人群
+    // 1. 生成人群 (重置遊戲)
     function renderCrowd() {
         if(isAnimating) return;
         
@@ -378,6 +248,7 @@
         
         if(names.length === 0) {
             crowdContainer.innerHTML = '<span style="color:#fff; font-size:12px;">無人排隊</span>';
+            countInfo.innerText = "死剩種人數: 0";
             return;
         }
 
@@ -393,118 +264,113 @@
                 <div class="person-name">${name}</div>
             `;
             
-            // 存儲數據以便之後讀取
             div.dataset.name = name;
             div.dataset.avatar = avatar;
 
             crowdContainer.appendChild(div);
-            personElements.push(div);
+            personElements.push(div); // 加入等待名單
         });
 
-        // 重置起重機位置到海面上
+        countInfo.innerText = `死剩種人數: ${personElements.length}`;
+        resultNameEl.innerText = "---";
+        resultNameEl.style.color = "#d32f2f";
         resetCrane();
     }
 
-    // 2. 輔助函數：等待
     const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // 3. 核心抽籤邏輯
+    // 2. 抽籤邏輯 (更新版)
     async function startDraw() {
         if (isAnimating) return;
+        
+        // 檢查是否還有人
         if (personElements.length === 0) {
-            alert('請先輸入名單並更新人群！');
+            alert('😱 所有人都在海裡了！\n請按「更新人群」重新開始。');
             return;
         }
 
         isAnimating = true;
         drawBtn.disabled = true;
         resultNameEl.innerText = '尋找目標...';
+        resultNameEl.style.color = "#999";
         
-        // 選中一個幸運兒
+        // --- 關鍵修改：抽出後從 Array 中移除 ---
         const randomIndex = Math.floor(Math.random() * personElements.length);
-        const targetEl = personElements[randomIndex];
+        const targetEl = personElements[randomIndex]; // 獲取 DOM 元素
+        
+        // 立刻從名單中移除，確保下次不會再抽中
+        personElements.splice(randomIndex, 1);
+        countInfo.innerText = `死剩種人數: ${personElements.length}`;
+
         const targetName = targetEl.dataset.name;
         const targetAvatar = targetEl.dataset.avatar;
 
-        // 計算目標位置 (相對於 game-area 左邊界)
+        // 計算位置
         const gameAreaRect = document.getElementById('gameArea').getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
-        
-        // 目標中心點 X 座標
         const targetX = (targetRect.left - gameAreaRect.left) + (targetRect.width / 2);
-        // 繩子需要放下的長度 (目標頭頂位置)
-        // 頂部 rail 在 top:40px, rope start at 60px. 
-        // 我們需要算出 rope 底部到 target 頂部的距離
-        const ropeStartTop = 60; // css top
+        const ropeStartTop = 60; 
         const targetTopRelative = targetRect.top - gameAreaRect.top;
-        const dropHeight = targetTopRelative - ropeStartTop - 20; // -20 是預留抓取空間
+        const dropHeight = targetTopRelative - ropeStartTop - 20;
 
-        // --- 動畫開始 ---
-
-        // A. 起重機移動到目標上方
+        // 動畫序列
+        // A. 移動
         crane.style.left = targetX + 'px';
-        await wait(1500); // 等待移動時間
+        await wait(1500);
 
-        // B. 放下繩子
+        // B. 放繩
         rope.style.height = dropHeight + 'px';
         await wait(1200);
 
-        // C. 抓取動作
-        claw.classList.add('closed'); // 閉合爪子
+        // C. 抓取
+        claw.classList.add('closed'); 
         await wait(200); 
         
-        // 切換顯示：隱藏地上的人，顯示爪子上的人
-        targetEl.classList.add('chosen'); 
-        victimOnClaw.style.display = 'flex';
-        clawAvatar.innerText = '😵'; // 換成暈倒表情
+        targetEl.classList.add('chosen'); // 地上的人消失
+        victimOnClaw.style.display = 'flex'; // 爪上的人出現
+        clawAvatar.innerText = '😵';
         clawName.innerText = targetName;
         await wait(500);
 
-        // D. 拉起繩子
-        rope.style.height = '60px'; // 收回初始長度
+        // D. 拉起
+        rope.style.height = '60px'; 
         await wait(1200);
 
-        // E. 移動回海面上 (Drop Zone)
+        // E. 運送
         crane.style.left = dropZoneLeft + 'px';
         await wait(1500);
 
         // F. 掉落
-        claw.classList.remove('closed'); // 打開爪子
-        victimOnClaw.style.display = 'none'; // 隱藏爪上人
+        claw.classList.remove('closed'); 
+        victimOnClaw.style.display = 'none'; 
         
-        // 設置掉落人偶的初始位置
         fallingVictim.style.display = 'flex';
-        fallingVictim.style.left = dropZoneLeft + 'px'; // 確保水平位置對齊
-        fallingVictim.style.top = (60 + 40) + 'px'; // 繩子收起的高度 + head高度
-        fallingAvatar.innerText = targetAvatar; // 恢復原本表情或保持暈倒
+        fallingVictim.style.left = dropZoneLeft + 'px'; 
+        fallingVictim.style.top = (60 + 40) + 'px';
+        fallingAvatar.innerText = targetAvatar; 
         fallingName.innerText = targetName;
         
-        // 觸發掉落動畫
         fallingVictim.classList.add('animate');
         
-        await wait(600); // 等待掉到水面
+        await wait(600); 
 
-        // G. 水花特效
+        // G. 水花 + 結果
         splash.style.left = dropZoneLeft + 'px';
         splash.classList.add('active');
         
-        // 顯示結果
         resultNameEl.innerText = targetName;
+        resultNameEl.style.color = "#d32f2f";
         
-        await wait(1000); // 稍作停頓
+        await wait(1000); 
 
-        // 清理與重置狀態
         isAnimating = false;
         drawBtn.disabled = false;
         
-        // 重置掉落人偶 (但不重置地上的人，表示他已經不在了)
         fallingVictim.style.display = 'none';
         fallingVictim.classList.remove('animate');
         splash.classList.remove('active');
         
-        // 如果想保留該人消失的狀態，就不執行 renderCrowd()
-        // 如果想每次都重置所有人，可以解開下面這行註釋
-        // renderCrowd(); 
+        // 這裡不再呼叫 renderCrowd，因為我們要保持「人變少了」的狀態
     }
 
     function resetCrane() {
